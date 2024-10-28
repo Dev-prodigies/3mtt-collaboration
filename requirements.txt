@@ -1,0 +1,16 @@
+fastapi
+fastapi_mail
+uvicorn
+pydantic[email]
+pydantic-settings
+sqlalchemy[asyncio]
+asyncpg
+bcrypt
+sendgrid
+redis
+python-dotenv
+psycopg2-binary
+PyJWT
+pyotp
+passlib
+orjson
