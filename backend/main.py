@@ -31,24 +31,31 @@ async def on_startup():
 
 @app.post("/register")
 async def register(user: UserCreate, redis_client: Redis = Depends(redis_con)):
-    user_email = user.email
-    otp = create_otp()
-    print("OTP", otp)
-    success = True #await send_email_async(EMAIL_OTP_SUBJECT, user_email, otp)
-    if not success:
+    try:
+        user_email = user.email
+        otp = create_otp()
+        print("OTP", otp)
+        success = True #await send_email_async(EMAIL_OTP_SUBJECT, user_email, otp)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send OTP.",
+            )
+        user =user.dict()
+        user.pop("confirm_password")
+        user = UserVerify(**user, otp=otp)
+        user_json_str = user.json()
+        redis_client.setex(user_email, 600, user_json_str)  # Store OTP with 10-minute expiry
+        return ORJSONResponse(
+            {"message": "OTP sent to mail"},
+            status_code=status.HTTP_201_CREATED,
+        )
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to send OTP.",
-        )
-    user =user.dict()
-    user.pop("confirm_password")
-    user = UserVerify(**user, otp=otp)
-    user_json_str = user.json()
-    redis_client.setex(user_email, 600, user_json_str)  # Store OTP with 10-minute expiry
-    return ORJSONResponse(
-        {"message": "OTP sent to mail"},
-        status_code=status.HTTP_201_CREATED,
-    )
+            detail="Something went wrong.",
+        ) from e
+
 
 @app.post("/verify-otp")
 async def verify_registration(
@@ -56,72 +63,84 @@ async def verify_registration(
     db: AsyncSession = Depends(db_con),
     redis_client: redis.Redis =  Depends(redis_con),
 ) -> ORJSONResponse:
-    stored_user_json = redis_client.get(request.email)
-    if not stored_user_json:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="OTP expired or not found"
-        )
-    user_data = json.loads(stored_user_json)
     try:
-        stored_user = UserVerify(**user_data)
-    except ValidationError as e:
+        stored_user_json = redis_client.get(request.email)
+        if not stored_user_json:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="OTP expired or not found"
+            )
+        user_data = json.loads(stored_user_json)
+        try:
+            stored_user = UserVerify(**user_data)
+        except ValidationError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Invalid user data",
+            ) from e
+
+        # if not verify_otp(stored_user.otp, request.otp):
+        #     raise HTTPException(
+        #         status_code=status.HTTP_400_BAD_REQUEST,
+        #         detail="Invalid OTP"
+        #     )
+
+        user = User(
+            email=stored_user.email,
+            password_hash=hash_password(stored_user.password)  # Replace with hashed password
+        )
+        db.add(user)
+        await db.commit()
+        #redis_client.delete(request.email)
+
+        return {"msg": "User registered successfully"}
+    except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Invalid user data",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Something went wrong.",
         ) from e
-
-    # if not verify_otp(stored_user.otp, request.otp):
-    #     raise HTTPException(
-    #         status_code=status.HTTP_400_BAD_REQUEST,
-    #         detail="Invalid OTP"
-    #     )
-
-    user = User(
-        email=stored_user.email,
-        password_hash=hash_password(stored_user.password)  # Replace with hashed password
-    )
-    db.add(user)
-    await db.commit()
-    #redis_client.delete(request.email)
-
-    return {"msg": "User registered successfully"}
 
 @app.post("/login/", response_model=Token)
 async def login(
     login_data: Login,
     db: AsyncSession = Depends(db_con),
 ) -> Token:
-    error_message = "Incorrect " + ("email" if login_data.email else "phone number") + " or password."
-    if login_data.email:
-        quary = (
-            select(User).filter(
-                User.email == login_data.email
+    try:
+        error_message = "Incorrect " + ("email" if login_data.email else "phone number") + " or password."
+        if login_data.email:
+            quary = (
+                select(User).filter(
+                    User.email == login_data.email
+                )
             )
-        )
-        print(login_data.email)
-    else:
-        quary = (
-            select(User)
-            .join(PhoneNumber)
-            .filter(
-                PhoneNumber.number == login_data.phone_number.number,
-                PhoneNumber.country_code == login_data.phone_number.country_code
+            print(login_data.email)
+        else:
+            quary = (
+                select(User)
+                .join(PhoneNumber)
+                .filter(
+                    PhoneNumber.number == login_data.phone_number.number,
+                    PhoneNumber.country_code == login_data.phone_number.country_code
+                )
             )
-        )
-    result = await db.execute(quary)
-    user_ = result.scalars().first()
-    user = UserSchema(
-        email=user_.email,
-        full_name="Temp",
-        # phone_number=user.phone_number,
-    ) if user_ else None
+        result = await db.execute(quary)
+        user_ = result.scalars().first()
+        user = UserSchema(
+            email=user_.email,
+            full_name="Temp",
+            # phone_number=user.phone_number,
+        ) if user_ else None
 
-    if not user or not verify_password(login_data.password, cast(str, user_.password_hash)):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=error_message)
+        if not user or not verify_password(login_data.password, cast(str, user_.password_hash)):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=error_message)
 
-    access_token = generate_access_token(user)
-    return Token(access_token=access_token)
+        access_token = generate_access_token(user)
+        return Token(access_token=access_token)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Something went wrong.",
+        ) from e
 
 @app.post("/complete-signup")
 async def complete_signup(
@@ -155,6 +174,11 @@ async def complete_signup(
         except IntegrityError as e:
             await db.rollback()
             raise e
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong.",
+            ) from e
     return ORJSONResponse(
         {"message": "Signup completed successfully"},
         status_code=status.HTTP_200_OK,
