@@ -4,7 +4,7 @@ services:
   app:
     build: .
     ports:
-      - 8000:8000
+      - 80:8000
     volumes:
       - ./backend:/app
       - pip_volume:/cache
@@ -17,7 +17,7 @@ services:
     ports:
       - 5432:5432
     volumes:
-      - 3mtt_postgres_datai:/var/lib/postgresql/data
+      - 3mtt_postgres_data:/var/lib/postgresql/data
     env_file:
       - .env
   #
@@ -36,4 +36,4 @@ services:
       - 6379:6379
 volumes:
   pip_volume:
-  3mtt_postgres_datai:
+  3mtt_postgres_data:
