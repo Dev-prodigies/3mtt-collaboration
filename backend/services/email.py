@@ -1,5 +1,6 @@
 from settings import MailSettings
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema
+import traceback
 
 OTP_TEMPLATE = "otp_template.html"
 
@@ -31,5 +32,5 @@ async def send_email_async(subject: str, email_to: str, otp: str) -> bool:
         await fm.send_message(message, template_name=OTP_TEMPLATE)
         return True
     except Exception as e:
-        print("Error: ", e)
+        traceback.print_exc()
         return False

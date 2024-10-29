@@ -3,6 +3,7 @@ from typing import Any, Optional, Union, cast
 
 import jwt
 import redis
+import traceback
 
 from connection.redis import get_redis_con
 from schemas import UserSchema
@@ -85,6 +86,12 @@ def get_current_user(token: str = Depends(JWTBearer())) -> UserSchema:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Something went wrong.",
+        )
 
 def sign_jwt(
     payload: dict,

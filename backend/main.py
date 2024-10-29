@@ -13,6 +13,7 @@ from schemas import CompleteSignup, Login, Token, UserCreate, UserSchema, UserVe
 
 
 import json
+import traceback
 from typing import Union, cast
 
 import redis
@@ -51,6 +52,7 @@ async def register(user: UserCreate, redis_client: Redis = Depends(redis_con)):
             status_code=status.HTTP_201_CREATED,
         )
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Something went wrong.",
@@ -95,6 +97,7 @@ async def verify_registration(
 
         return {"msg": "User registered successfully"}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Something went wrong.",
@@ -137,6 +140,7 @@ async def login(
         access_token = generate_access_token(user)
         return Token(access_token=access_token)
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Something went wrong.",
@@ -175,6 +179,7 @@ async def complete_signup(
             await db.rollback()
             raise e
         except Exception as e:
+            traceback.print_exc()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong.",

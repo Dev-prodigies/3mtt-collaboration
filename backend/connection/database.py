@@ -1,4 +1,5 @@
 from sqlalchemy import text
+import traceback
 from fastapi import HTTPException, status
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -37,6 +38,7 @@ async def get_db() -> AsyncSession:
         async with AsyncSessionLocal() as session:
             yield session
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Something went wrong.",

@@ -1,4 +1,5 @@
 import redis
+import traceback
 from fastapi import HTTPException, status
 
 from settings import RedisSettings
@@ -10,6 +11,7 @@ def get_redis_con() -> redis.Redis:
         pool = redis.ConnectionPool(host=setting.REDIS_HOST, port=setting.REDIS_PORT, db=0)
         return redis.Redis(connection_pool=pool)
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Something went wrong.",
