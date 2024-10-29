@@ -16,7 +16,7 @@ engine = create_async_engine(str(settings.DB_URL))
 async def database_init():
     async with engine.connect() as con:
         # drop tables
-        await con.run_sync(Base.metadata.drop_all)
+        # await con.run_sync(Base.metadata.drop_all)
 
         # Install extensions
         if engine.dialect.name == DATABASE:

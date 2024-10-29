@@ -1,4 +1,5 @@
 from sqlalchemy import select
+from connection.database import database_init
 from services.auth import generate_access_token, get_current_user
 from dependencies import db_con, redis_con
 from services.email import send_email_async
@@ -24,20 +25,16 @@ EMAIL_OTP_SUBJECT = "Your otp verification code"
 
 app = FastAPI()
 
-def create_db_and_tables():
-    "metadata.create_all(engine)"
-    pass
-
 @app.on_event("startup")
-def on_startup():
-    create_db_and_tables()
+async def on_startup():
+    await database_init()
 
 @app.post("/register")
 async def register(user: UserCreate, redis_client: Redis = Depends(redis_con)):
     user_email = user.email
     otp = create_otp()
     print("OTP", otp)
-    await send_email_async(EMAIL_OTP_SUBJECT, user_email, otp)
+    success = True #await send_email_async(EMAIL_OTP_SUBJECT, user_email, otp)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -85,7 +82,8 @@ async def verify_registration(
         password_hash=hash_password(stored_user.password)  # Replace with hashed password
     )
     db.add(user)
-    redis_client.delete(request.email)
+    await db.commit()
+    #redis_client.delete(request.email)
 
     return {"msg": "User registered successfully"}
 
@@ -101,6 +99,7 @@ async def login(
                 User.email == login_data.email
             )
         )
+        print(login_data.email)
     else:
         quary = (
             select(User)
@@ -111,14 +110,14 @@ async def login(
             )
         )
     result = await db.execute(quary)
-    user = result.scalars().first()
+    user_ = result.scalars().first()
     user = UserSchema(
-        email=user.email,
-        full_name=user.full_name,
+        email=user_.email,
+        full_name="Temp",
         # phone_number=user.phone_number,
-    ) if user else None
+    ) if user_ else None
 
-    if not user or not verify_password(login_data.password, cast(str, user.hashed_password)):
+    if not user or not verify_password(login_data.password, cast(str, user_.password_hash)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=error_message)
 
     access_token = generate_access_token(user)

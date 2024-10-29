@@ -9,10 +9,18 @@ from sqlalchemy.orm import relationship
 
 Base = declarative_base()
 class BaseModel:
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    created_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc))
+    id = Column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+        nullable=False
+    )
+    created_at = Column(
+        DateTime(timezone=True), default=datetime.now(timezone.utc),
+        nullable=False
+    )
     updated_at = Column(
-        DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc)
+        DateTime(timezone=True), default=datetime.now(timezone.utc),
+        onupdate=datetime.now(timezone.utc),
+        nullable=False
     )
 
 class PhoneNumber(BaseModel, Base):
@@ -23,7 +31,10 @@ class PhoneNumber(BaseModel, Base):
 
 class User(BaseModel, Base):
     __tablename__ = "users"
-    phone_number_id = Column(UUID(as_uuid=True), ForeignKey("phone_number.id"), nullable=False)
+    phone_number_id = Column(
+        UUID(as_uuid=True), ForeignKey("phone_number.id"),
+        nullable=True
+    )
     email = Column(String, unique=True, index=True)
     full_name = Column(String)
     password_hash = Column(String, nullable=False)

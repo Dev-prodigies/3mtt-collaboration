@@ -4,6 +4,7 @@ from typing import Any, Optional, Union, cast
 import jwt
 import redis
 
+from connection.redis import get_redis_con
 from schemas import UserSchema
 from dependencies import redis_con
 from settings import Secret
@@ -23,13 +24,12 @@ class JWTBearer(HTTPBearer):
         self,
         secret: str = settings.SECRET_KEY,
         algorithm: str = ALGORITHM,
-        redisCon: redis.Redis = Depends(redis_con),
         auto_error: bool = True,
     ):
         super().__init__(auto_error=auto_error)
         self.secret = secret
         self.algorithm = algorithm
-        self.redis = redisCon
+        self.redis = get_redis_con()
 
     async def __call__(self, request: Request) -> HTTPAuthorizationCredentials:
         credentials: HTTPAuthorizationCredentials = await super().__call__(request)
@@ -77,7 +77,7 @@ def get_current_user(token: str = Depends(JWTBearer())) -> UserSchema:
         if payload := decode_jwt(token, settings.SECRET_KEY):
             return UserSchema(
                 email=payload["email"],
-                phone_number=payload["phone_number"],
+                # phone_number=payload["phone_number"],
                 full_name=payload["full_name"]
             )
         raise ValueError("payload is empty")
@@ -92,7 +92,7 @@ def sign_jwt(
     expires_min: Optional[timedelta] = None,
 ) -> str:
     payload["exp"] = datetime.now(timezone.utc) + timedelta(
-            min=expires_min if expires_min else TOKEN_EXPIRE_MIN)
+            minutes=expires_min if expires_min else TOKEN_EXPIRE_MIN)
     token = jwt.encode(payload, secret, algorithm=ALGORITHM)
     return token
 
