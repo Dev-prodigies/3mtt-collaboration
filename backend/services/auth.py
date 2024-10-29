@@ -91,8 +91,7 @@ def sign_jwt(
     secret: str,
     expires_min: Optional[timedelta] = None,
 ) -> str:
-    payload["exp"] = datetime.now(timezone.utc) +
-        timedelta(
+    payload["exp"] = datetime.now(timezone.utc) + timedelta(
             min=expires_min if expires_min else TOKEN_EXPIRE_MIN)
     token = jwt.encode(payload, secret, algorithm=ALGORITHM)
     return token
@@ -122,5 +121,5 @@ def generate_access_token(
         "full_name": user.full_name
     }
     secret: str = settings.SECRET_KEY
-    token = sign_jwt(payload, secret=secret, expires_min=expires_minutes
+    token = sign_jwt(payload, secret=secret, expires_min=expires_minutes)
     return token
