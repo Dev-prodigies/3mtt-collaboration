@@ -35,8 +35,7 @@ async def register(user: UserCreate, redis_client: Redis = Depends(redis_con)):
     try:
         user_email = user.email
         otp = create_otp()
-        print("OTP", otp)
-        success = True #await send_email_async(EMAIL_OTP_SUBJECT, user_email, otp)
+        success = await send_email_async(EMAIL_OTP_SUBJECT, user_email, otp)
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
